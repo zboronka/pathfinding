@@ -3,6 +3,9 @@ package com.pathfinding;
 import java.io.*;
 import java.util.Collection;
 import java.util.ArrayList;
+import java.util.HashMap;
+import java.util.PriorityQueue;
+
 import com.badlogic.gdx.ApplicationAdapter;
 import com.badlogic.gdx.Gdx;
 import com.badlogic.gdx.graphics.glutils.ShapeRenderer;
@@ -10,7 +13,6 @@ import com.badlogic.gdx.graphics.glutils.ShapeRenderer.ShapeType;
 import com.badlogic.gdx.graphics.GL20;
 import com.badlogic.gdx.graphics.Texture;
 import com.badlogic.gdx.utils.viewport.ExtendViewport;
-import com.badlogic.gdx.math.Vector2;
 
 public class Pathfinding extends ApplicationAdapter {
 	final int WIDTH = 800;
@@ -24,13 +26,22 @@ public class Pathfinding extends ApplicationAdapter {
 	ExtendViewport viewport;
 
 	BufferedReader in = null;
-	Node[][] map = new Node[10000][10000];
+	ArrayList<Node> map = new ArrayList<Node>();
+	HashMap<Integer,Node> teleports = new HashMap<>();
 	
 	@Override
 	public void create () {
 		shapeRenderer = new ShapeRenderer();
 		viewport = new ExtendViewport(WIDTH, HEIGHT);
 		readInput();
+		HashMap<Node,Integer> dist = new HashMap<>();
+		HashMap<Node,Node> prev = new HashMap<>();
+		aStar(map.get(0), map.get(2), dist, prev);
+		Node u = map.get(2);
+		while(u != null) {
+			System.out.println(u);
+			u = prev.get(u);
+		}
 	}
 
 	@Override
@@ -40,15 +51,13 @@ public class Pathfinding extends ApplicationAdapter {
 
 		shapeRenderer.setProjectionMatrix(viewport.getCamera().combined);
 		shapeRenderer.begin(ShapeType.Filled);
-		for(int y = 0; y < map_max_y; y++) {
-			for(int x = 0; x < map_max_x; x++) {
-				if(map[x][y].t_id > 0) {
-					shapeRenderer.setColor(0, 0.1f * map[x][y].t_id, 1.0f/map[x][y].t_id, 1);
-				} else {
-					shapeRenderer.setColor(0.1f * map[x][y].cost, 0.1f * (10-map[x][y].cost), 0.1f * (10-map[x][y].cost), 1);
-				}
-				shapeRenderer.rect(-WIDTH/2+x*tile_width, HEIGHT/2-(y+1)*tile_width, tile_width, tile_width);
+		for(Node n : map) {
+			if(n.t_id > 0) {
+				shapeRenderer.setColor(0, 0.1f * n.t_id, 1.0f/n.t_id, 1);
+			} else {
+				shapeRenderer.setColor(0.1f * n.cost, 0.1f * (10-n.cost), 0.1f * (10-n.cost), 1);
 			}
+			shapeRenderer.rect(-WIDTH/2+n.pos.x*tile_width, HEIGHT/2-(n.pos.y+1)*tile_width, tile_width, tile_width);
 		}
 		shapeRenderer.end();
 	}
@@ -72,18 +81,28 @@ public class Pathfinding extends ApplicationAdapter {
 				boolean bottom = !in.ready();
 
 				for(map_max_x = 0; map_max_x < nodes.length; map_max_x++) {
-					ArrayList<int[]> links = new ArrayList<int[]>();
-					setLinks(map_max_x, map_max_y, map_max_x == nodes.length - 1, bottom,  links);
+					ArrayList<Vector2> links = new ArrayList<>();
+					setLinks(map_max_x, map_max_y, map_max_x == nodes.length - 1, bottom, links);
 
 					switch(nodes[map_max_x].charAt(0)) {
 						case 'F':
-							map[map_max_x][map_max_y] = new Node(10, links);
+							map.add(new Node(10, new Vector2(map_max_x,map_max_y), links));
 							break;
 						case 'T':
-							map[map_max_x][map_max_y] = new Node(1, links, Integer.parseInt(nodes[map_max_x].substring(1)));
+							Integer t_id = Integer.parseInt(nodes[map_max_x].substring(1));
+							Node current = new Node(1, new Vector2(map_max_x, map_max_y), links, t_id);
+							if(teleports.containsKey(t_id)) {
+								Node tel = teleports.get(t_id);
+								links.add(tel.pos);
+								tel.connections.add(new Vector2(map_max_x,map_max_y));
+							} else {
+								teleports.put(t_id, current);
+							}
+
+							map.add(current);	
 							break;
 						default:
-							map[map_max_x][map_max_y] = new Node(Integer.parseInt(nodes[map_max_x]), links);
+							map.add(new Node(Integer.parseInt(nodes[map_max_x]), new Vector2(map_max_x, map_max_y), links));
 					}
 				}
 			}
@@ -97,16 +116,68 @@ public class Pathfinding extends ApplicationAdapter {
 
 	public void setLinks(int x, int y, boolean right, boolean bottom, Collection links) {
 		if(x > 0) {
-			links.add(new int[] {x - 1, y});
+			links.add(new Vector2(x - 1, y));
 		}
 		if(y > 0) {
-			links.add(new int[] {x, y - 1});
+			links.add(new Vector2(x, y - 1));
 		}
 		if(!right) {
-			links.add(new int[] {x + 1, y});
+			links.add(new Vector2(x + 1, y));
 		}
 		if(!bottom) {
-			links.add(new int[] {x, y + 1});
+			links.add(new Vector2(x, y + 1));
+		}
+	}
+
+	public void aStar(Node start, Node end, HashMap<Node,Integer> dist, HashMap<Node,Node> prev) {
+		dist.put(start, 0);
+
+		PriorityQueue<Distance> pq = new PriorityQueue<>();
+
+		pq.add(new Distance(start, 0));
+		while(pq.peek() != null) {
+			Distance u = pq.poll();
+			for(Vector2 v : u.node.connections) {
+				Node nv = map.get(v.x+v.y*map_max_x);
+				int alt = dist.get(u.node) + nv.cost;
+				if(alt < dist.getOrDefault(nv, Integer.MAX_VALUE)) {
+					dist.put(nv, alt);
+					prev.put(nv, u.node);
+					pq.remove(new Distance(nv, 0));
+					pq.add(new Distance(nv, alt));
+				}
+			}
+		}
+	}
+
+	class Distance implements Comparable<Distance> {
+		public Node node;
+		public int distance;
+
+		public Distance(Node node, int distance) {
+			this.node = node;
+			this.distance = distance;
+		}
+
+		public int compareTo(Distance o) {
+			return Integer.compare(distance, o.distance);
+		}
+
+		@Override
+		public boolean equals(Object o) {
+			if(o == this) {
+				return true;
+			}
+			if(!(o instanceof Distance)) {
+				return false;
+			}
+
+			Distance d = (Distance) o;
+			return d.node.pos == this.node.pos;
+		}
+
+		public String toString() {
+			return "(" + node.pos + ", " + distance + ")";
 		}
 	}
 }
