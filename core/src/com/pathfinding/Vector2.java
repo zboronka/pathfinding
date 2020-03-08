@@ -14,6 +14,6 @@ public class Vector2 {
 	}
 
 	public double distance(Vector2 o) {
-		return Math.sqrt((x-o.x)^2+(y-o.y)^2);
+		return Math.sqrt(Math.pow((x-o.x),2)+Math.pow((y-o.y),2));
 	}
 }

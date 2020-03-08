@@ -17,16 +17,22 @@ import com.badlogic.gdx.utils.viewport.ExtendViewport;
 public class Pathfinding extends ApplicationAdapter {
 	final int WIDTH = 800;
 	final int HEIGHT = 600;
+	final int TILE_WIDTH = 20;
 
 	int map_max_y;
 	int map_max_x;
-	int tile_width;
+
+	String filename;
 
 	ShapeRenderer shapeRenderer;
 	ExtendViewport viewport;
 
 	BufferedReader in = null;
 	ArrayList<Node> map = new ArrayList<Node>();
+
+	public Pathfinding(String [] args) {
+		filename = args.length > 0 ? args[0] : "input1";
+	}
 	
 	@Override
 	public void create() {
@@ -36,8 +42,9 @@ public class Pathfinding extends ApplicationAdapter {
 		HashMap<Node,Integer> dist = new HashMap<>();
 		HashMap<Node,Node> prev = new HashMap<>();
 		Node source = map.get(0);
-		Node target = map.get(10);
+		Node target = map.get(6);
 
+		//dijkstra(source, target, dist, prev);
 		aStar(source, target, dist, prev);
 
 		Node u = target;
@@ -65,7 +72,7 @@ public class Pathfinding extends ApplicationAdapter {
 			} else {
 				shapeRenderer.setColor(0.1f * n.cost, 0.1f * (10-n.cost), 0.1f * (10-n.cost), 1);
 			}
-			shapeRenderer.rect(-WIDTH/2+n.pos.x*tile_width, HEIGHT/2-(n.pos.y+1)*tile_width, tile_width, tile_width);
+			shapeRenderer.rect(-WIDTH/2+n.pos.x*TILE_WIDTH, HEIGHT/2-(n.pos.y+1)*TILE_WIDTH, TILE_WIDTH, TILE_WIDTH);
 		}
 		shapeRenderer.end();
 	}
@@ -82,7 +89,7 @@ public class Pathfinding extends ApplicationAdapter {
 
 	public void readInput() {
 		try {
-			in = new BufferedReader(new FileReader("input"));
+			in = new BufferedReader(new FileReader(filename));
 			HashMap<Integer,Node> teleports = new HashMap<>();
 
 			for(map_max_y = 0; in.ready(); map_max_y++) {
@@ -115,8 +122,6 @@ public class Pathfinding extends ApplicationAdapter {
 					}
 				}
 			}
-
-			tile_width = WIDTH/map_max_x;
 			in.close();
 		} catch(IOException e) {
 			e.printStackTrace();
@@ -147,14 +152,10 @@ public class Pathfinding extends ApplicationAdapter {
 		double distance;
 
 		pq.add(new Distance(source, 0));
-		int i = 0;
 		while(pq.peek() != null) {
 			Distance u = pq.poll();
 			Node nu = u.node;
 			tele = nu.t_id > 0;
-
-			i++;
-			System.out.println("Looked at " + i + " nodes");
 
 			for(Vector2 v : nu.connections) {
 				Node nv = map.get(v.x+v.y*map_max_x);
@@ -189,14 +190,10 @@ public class Pathfinding extends ApplicationAdapter {
 		boolean port = false;
 
 		pq.add(new Distance(source, 0));
-		int i = 0;
 		while(pq.peek() != null) {
 			Distance u = pq.poll();
 			Node nu = u.node;
 			tele = nu.t_id > 0;
-
-			i++;
-			System.out.println("Looked at " + i + " nodes");
 
 			for(Vector2 v : nu.connections) {
 				Node nv = map.get(v.x+v.y*map_max_x);

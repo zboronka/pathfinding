@@ -13,6 +13,9 @@ task run(dependsOn: classes, type: JavaExec) {
     standardInput = System.in
     workingDir = project.assetsDir
     ignoreExitValue = true
+	if (project.hasProperty('file')) {
+		args(file)
+	}
 }
 
 task debug(dependsOn: classes, type: JavaExec) {
