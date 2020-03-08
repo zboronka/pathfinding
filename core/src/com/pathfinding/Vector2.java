@@ -12,4 +12,8 @@ public class Vector2 {
 	public String toString() {
 		return "(" + x + "," + y + ")";
 	}
+
+	public double distance(Vector2 o) {
+		return Math.sqrt((x-o.x)^2+(y-o.y)^2);
+	}
 }

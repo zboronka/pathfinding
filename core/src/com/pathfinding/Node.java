@@ -22,10 +22,6 @@ public class Node {
 	}
 
 	public String toString() {
-		String ret = "Position: " + pos + " Cost: " + cost + " Links to: "; 
-		for(Vector2 neighbor : connections) {
-			ret += neighbor + " ";
-		}
-		return ret;
+		return "Node: " + pos + " Cost: " + cost; 
 	}
 }
