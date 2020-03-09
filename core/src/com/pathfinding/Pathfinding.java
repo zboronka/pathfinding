@@ -36,6 +36,7 @@ public class Pathfinding extends ApplicationAdapter {
 	Matrix4 mapCamera;
 	Matrix4 independent;
 	Vector2 mouse;
+	Vector3 trns = new Vector3(0,0,0);
 
 	HashMap<Node,Node> prev;
 	HashMap<Node,Integer> dist;
@@ -65,15 +66,6 @@ public class Pathfinding extends ApplicationAdapter {
 		prev = new HashMap<>();
 		dist = new HashMap<>();
 		path = new ArrayList<>();
-
-		/*
-		Node source = map.get(0);
-		Node target = map.get(5);
-
-		aStar(source, target, dist, prev);
-
-		path = readPath(target);
-		*/
 	}
 
 	@Override
@@ -92,16 +84,23 @@ public class Pathfinding extends ApplicationAdapter {
 		}
 		if(controller.click) {
 			mouse = new Vector2(controller.mousex, controller.mousey);
-			int mx = (int) Math.floor(mouse.x/16);
-			int my = (int) Math.floor(mouse.y/16);
-			if(map.size() > mx + my*map_max_x) {
-				Node s = map.get(mx + my*map_max_x);
+			trns = independent.getTranslation(new Vector3(0,0,0));
+
+			int mx = (int) (Math.floor(mouse.x/16)+(trns.x*-20));
+			int my = (int) (Math.floor(mouse.y/16)+(trns.y*15));
+			int index = mx + my*map_max_x;
+			if(index >= 0 && map.size() > index) {
+				Node s = map.get(index);
 				s.selected = !s.selected;
 				if(one_node == s) {
 					one_node = null;
 					one_node_selected = false;
 				} else if(one_node_selected) {
-					aStar(one_node, s, dist, prev);
+					if(controller.aStar) {
+						aStar(one_node, s, dist, prev);
+					} else {
+						dijkstra(one_node, s, dist, prev);
+					}
 					path = readPath(s);
 
 					one_node.selected = false;

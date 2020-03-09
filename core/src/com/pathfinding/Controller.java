@@ -4,7 +4,7 @@ import com.badlogic.gdx.InputAdapter;
 import com.badlogic.gdx.Input.Keys;
 
 public class Controller extends InputAdapter {
-	public boolean left, right, up, down, click;
+	public boolean left, right, up, down, click, aStar = true;
 	public int mousex, mousey;
 
 	public boolean keyDown(int keycode) {
@@ -20,6 +20,10 @@ public class Controller extends InputAdapter {
 				break;
 			case Keys.DOWN:
 				down = true;
+				break;
+			case Keys.S:
+				aStar = !aStar;
+				break;
 		}
 
 		return true;
@@ -38,6 +42,7 @@ public class Controller extends InputAdapter {
 				break;
 			case Keys.DOWN:
 				down = false;
+				break;
 		}
 
 		return true;
