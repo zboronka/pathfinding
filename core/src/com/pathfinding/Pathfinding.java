@@ -13,6 +13,9 @@ import com.badlogic.gdx.graphics.glutils.ShapeRenderer.ShapeType;
 import com.badlogic.gdx.graphics.GL20;
 import com.badlogic.gdx.graphics.Texture;
 import com.badlogic.gdx.utils.viewport.ExtendViewport;
+import com.badlogic.gdx.math.Matrix4;
+import com.badlogic.gdx.math.Vector2;
+import com.badlogic.gdx.math.Vector3;
 
 public class Pathfinding extends ApplicationAdapter {
 	final int WIDTH = 800;
@@ -22,13 +25,26 @@ public class Pathfinding extends ApplicationAdapter {
 	int map_max_y;
 	int map_max_x;
 
+	Node one_node;
+	boolean one_node_selected = false;
+
 	String filename;
 
 	ShapeRenderer shapeRenderer;
+	ShapeRenderer nodeRenderer;
 	ExtendViewport viewport;
+	Matrix4 mapCamera;
+	Matrix4 independent;
+	Vector2 mouse;
+
+	HashMap<Node,Node> prev;
+	HashMap<Node,Integer> dist;
 
 	BufferedReader in = null;
 	ArrayList<Node> map = new ArrayList<Node>();
+	ArrayList<Node> path;
+
+	Controller controller;
 
 	public Pathfinding(String [] args) {
 		filename = args.length > 0 ? args[0] : "input1";
@@ -36,43 +52,99 @@ public class Pathfinding extends ApplicationAdapter {
 	
 	@Override
 	public void create() {
-		shapeRenderer = new ShapeRenderer();
-		viewport = new ExtendViewport(WIDTH, HEIGHT);
-		readInput();
-		HashMap<Node,Integer> dist = new HashMap<>();
-		HashMap<Node,Node> prev = new HashMap<>();
-		Node source = map.get(0);
-		Node target = map.get(6);
+		controller = new Controller();
+		Gdx.input.setInputProcessor(controller);
 
-		//dijkstra(source, target, dist, prev);
+		shapeRenderer = new ShapeRenderer();
+		nodeRenderer = new ShapeRenderer();
+		viewport = new ExtendViewport(WIDTH, HEIGHT);
+		mapCamera = viewport.getCamera().combined;
+		independent = new Matrix4(viewport.getCamera().combined);
+		readInput();
+
+		prev = new HashMap<>();
+		dist = new HashMap<>();
+		path = new ArrayList<>();
+
+		/*
+		Node source = map.get(0);
+		Node target = map.get(5);
+
 		aStar(source, target, dist, prev);
 
-		Node u = target;
-		if(prev.get(u) != null) {
-			System.out.println("Distance to: " + dist.get(u));
-			while(u != null) {
-				System.out.println(u);
-				u = prev.get(u);
-			}
-		} else {
-			System.out.println("Unreachable");
-		}
+		path = readPath(target);
+		*/
 	}
 
 	@Override
 	public void render() {
-		Gdx.gl.glClearColor(0, 0, 0, 1);
+		if(controller.left) {
+			independent.translate(1,0,0);
+		}
+		if(controller.right) {
+			independent.translate(-1,0,0);
+		}
+		if(controller.up) {
+			independent.translate(0,-1,0);
+		}
+		if(controller.down) {
+			independent.translate(0,1,0);
+		}
+		if(controller.click) {
+			mouse = new Vector2(controller.mousex, controller.mousey);
+			int mx = (int) Math.floor(mouse.x/16);
+			int my = (int) Math.floor(mouse.y/16);
+			if(map.size() > mx + my*map_max_x) {
+				Node s = map.get(mx + my*map_max_x);
+				s.selected = !s.selected;
+				if(one_node == s) {
+					one_node = null;
+					one_node_selected = false;
+				} else if(one_node_selected) {
+					aStar(one_node, s, dist, prev);
+					path = readPath(s);
+
+					one_node.selected = false;
+					s.selected = false;
+
+					one_node = null;
+					one_node_selected = false;
+				} else {
+					one_node = s;
+					one_node_selected = true;
+				}
+			}
+
+			controller.click = false;
+		}
+
+		Gdx.gl.glClearColor(1, 1, 1, 1);
 		Gdx.gl.glClear(GL20.GL_COLOR_BUFFER_BIT);
 
-		shapeRenderer.setProjectionMatrix(viewport.getCamera().combined);
-		shapeRenderer.begin(ShapeType.Filled);
+		shapeRenderer.setProjectionMatrix(independent);
+		nodeRenderer.setProjectionMatrix(independent);
+
+		nodeRenderer.begin(ShapeType.Filled);
 		for(Node n : map) {
-			if(n.t_id > 0) {
-				shapeRenderer.setColor(0, 0.1f * n.t_id, 1.0f/n.t_id, 1);
-			} else {
-				shapeRenderer.setColor(0.1f * n.cost, 0.1f * (10-n.cost), 0.1f * (10-n.cost), 1);
+			if(prev.containsKey(n)) {
+				nodeRenderer.setColor(1, 0, 0, 1);
+				nodeRenderer.rect((float)-WIDTH/2+n.pos.x*TILE_WIDTH, HEIGHT/2-(n.pos.y+1)*TILE_WIDTH, TILE_WIDTH, TILE_WIDTH);
 			}
-			shapeRenderer.rect(-WIDTH/2+n.pos.x*TILE_WIDTH, HEIGHT/2-(n.pos.y+1)*TILE_WIDTH, TILE_WIDTH, TILE_WIDTH);
+			if(path.contains(n)) {
+				nodeRenderer.setColor(1, 0.7f, 0, 1);
+				nodeRenderer.rect((float)-WIDTH/2+n.pos.x*TILE_WIDTH, HEIGHT/2-(n.pos.y+1)*TILE_WIDTH, TILE_WIDTH, TILE_WIDTH);
+			}
+			if(n.selected) {
+				nodeRenderer.setColor(0, 0, 1, 1);
+				nodeRenderer.rect((float)-WIDTH/2+n.pos.x*TILE_WIDTH, HEIGHT/2-(n.pos.y+1)*TILE_WIDTH, TILE_WIDTH, TILE_WIDTH);
+			}
+		}
+		nodeRenderer.end();
+
+		shapeRenderer.begin(ShapeType.Line);
+		shapeRenderer.setColor(0, 0, 0, 1);
+		for(Node n : map) {
+			shapeRenderer.rect((float)-WIDTH/2+n.pos.x*TILE_WIDTH, HEIGHT/2-(n.pos.y+1)*TILE_WIDTH, TILE_WIDTH, TILE_WIDTH);
 		}
 		shapeRenderer.end();
 	}
@@ -85,9 +157,10 @@ public class Pathfinding extends ApplicationAdapter {
 	@Override
 	public void resize(int width, int height) {
 		viewport.update(width, height, false);
+		independent = new Matrix4(viewport.getCamera().combined);
 	}
 
-	public void readInput() {
+	private void readInput() {
 		try {
 			in = new BufferedReader(new FileReader(filename));
 			HashMap<Integer,Node> teleports = new HashMap<>();
@@ -97,20 +170,20 @@ public class Pathfinding extends ApplicationAdapter {
 				boolean bottom = !in.ready();
 
 				for(map_max_x = 0; map_max_x < nodes.length; map_max_x++) {
-					ArrayList<Vector2> links = new ArrayList<>();
+					ArrayList<Vec2> links = new ArrayList<>();
 					setLinks(map_max_x, map_max_y, map_max_x == nodes.length - 1, bottom, links);
 
 					switch(nodes[map_max_x].charAt(0)) {
 						case 'F':
-							map.add(new Node(-1, new Vector2(map_max_x,map_max_y), links));
+							map.add(new Node(-1, new Vec2(map_max_x,map_max_y), links));
 							break;
 						case 'T':
 							Integer t_id = Integer.parseInt(nodes[map_max_x].substring(1));
-							Node current = new Node(1, new Vector2(map_max_x, map_max_y), links, t_id);
+							Node current = new Node(1, new Vec2(map_max_x, map_max_y), links, t_id);
 							if(teleports.containsKey(t_id)) {
 								Node tel = teleports.get(t_id);
 								links.add(tel.pos);
-								tel.connections.add(new Vector2(map_max_x,map_max_y));
+								tel.connections.add(new Vec2(map_max_x,map_max_y));
 							} else {
 								teleports.put(t_id, current);
 							}
@@ -118,7 +191,7 @@ public class Pathfinding extends ApplicationAdapter {
 							map.add(current);	
 							break;
 						default:
-							map.add(new Node(Integer.parseInt(nodes[map_max_x]), new Vector2(map_max_x, map_max_y), links));
+							map.add(new Node(Integer.parseInt(nodes[map_max_x]), new Vec2(map_max_x, map_max_y), links));
 					}
 				}
 			}
@@ -128,22 +201,24 @@ public class Pathfinding extends ApplicationAdapter {
 		}
 	}
 
-	public void setLinks(int x, int y, boolean right, boolean bottom, Collection links) {
+	private void setLinks(int x, int y, boolean right, boolean bottom, Collection links) {
 		if(x > 0) {
-			links.add(new Vector2(x - 1, y));
+			links.add(new Vec2(x - 1, y));
 		}
 		if(y > 0) {
-			links.add(new Vector2(x, y - 1));
+			links.add(new Vec2(x, y - 1));
 		}
 		if(!right) {
-			links.add(new Vector2(x + 1, y));
+			links.add(new Vec2(x + 1, y));
 		}
 		if(!bottom) {
-			links.add(new Vector2(x, y + 1));
+			links.add(new Vec2(x, y + 1));
 		}
 	}
 
-	public void aStar(Node source, Node target, HashMap<Node,Integer> dist, HashMap<Node,Node> prev) {
+	private void aStar(Node source, Node target, HashMap<Node,Integer> dist, HashMap<Node,Node> prev) {
+		dist.clear();
+		prev.clear();
 		dist.put(source, 0);
 
 		PriorityQueue<Distance> pq = new PriorityQueue<>();
@@ -157,7 +232,7 @@ public class Pathfinding extends ApplicationAdapter {
 			Node nu = u.node;
 			tele = nu.t_id > 0;
 
-			for(Vector2 v : nu.connections) {
+			for(Vec2 v : nu.connections) {
 				Node nv = map.get(v.x+v.y*map_max_x);
 				port = tele && nv.t_id > 0;
 				int alt = dist.get(nu) + (tele && port ? 0 : nv.cost);
@@ -182,7 +257,9 @@ public class Pathfinding extends ApplicationAdapter {
 		}
 	}
 
-	public void dijkstra(Node source, Node target, HashMap<Node,Integer> dist, HashMap<Node,Node> prev) {
+	private void dijkstra(Node source, Node target, HashMap<Node,Integer> dist, HashMap<Node,Node> prev) {
+		dist.clear();
+		prev.clear();
 		dist.put(source, 0);
 
 		PriorityQueue<Distance> pq = new PriorityQueue<>();
@@ -195,7 +272,7 @@ public class Pathfinding extends ApplicationAdapter {
 			Node nu = u.node;
 			tele = nu.t_id > 0;
 
-			for(Vector2 v : nu.connections) {
+			for(Vec2 v : nu.connections) {
 				Node nv = map.get(v.x+v.y*map_max_x);
 				port = tele && nv.t_id > 0;
 				int alt = dist.get(nu) + (tele && port ? 0 : nv.cost);
@@ -210,6 +287,19 @@ public class Pathfinding extends ApplicationAdapter {
 				}
 			}
 		}
+	}
+	
+	private ArrayList<Node> readPath(Node target) {
+		ArrayList<Node> path = new ArrayList<>();
+		Node u = target;
+		if(prev.get(u) != null) {
+			while(u != null) {
+				path.add(u);
+				u = prev.get(u);
+			}
+		}
+
+		return path;
 	}
 
 	class Distance implements Comparable<Distance> {
