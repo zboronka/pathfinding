@@ -71,16 +71,16 @@ public class Pathfinding extends ApplicationAdapter {
 	@Override
 	public void render() {
 		if(controller.left) {
-			independent.translate(1,0,0);
+			independent.translate(10,0,0);
 		}
 		if(controller.right) {
-			independent.translate(-1,0,0);
+			independent.translate(-10,0,0);
 		}
 		if(controller.up) {
-			independent.translate(0,-1,0);
+			independent.translate(0,-10,0);
 		}
 		if(controller.down) {
-			independent.translate(0,1,0);
+			independent.translate(0,10,0);
 		}
 		if(controller.click) {
 			mouse = new Vector2(controller.mousex, controller.mousey);
